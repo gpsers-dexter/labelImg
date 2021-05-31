@@ -51,7 +51,7 @@ from libs.create_ml_io import JSON_EXT
 from libs.ustr import ustr
 from libs.hashableQListWidgetItem import HashableQListWidgetItem
 
-__appname__ = 'labelImg'
+__appname__ = 'CataOvo Egg Labeler'
 
 
 class WindowMixin(object):
@@ -123,31 +123,13 @@ class MainWindow(QMainWindow, WindowMixin):
         list_layout = QVBoxLayout()
         list_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create a widget for using default label
-        self.use_default_label_checkbox = QCheckBox(get_str('useDefaultLabel'))
-        self.use_default_label_checkbox.setChecked(False)
-        self.default_label_text_line = QLineEdit()
-        use_default_label_qhbox_layout = QHBoxLayout()
-        use_default_label_qhbox_layout.addWidget(self.use_default_label_checkbox)
-        use_default_label_qhbox_layout.addWidget(self.default_label_text_line)
-        use_default_label_container = QWidget()
-        use_default_label_container.setLayout(use_default_label_qhbox_layout)
-
         # Create a widget for edit and diffc button
         self.diffc_button = QCheckBox(get_str('useDifficult'))
         self.diffc_button.setChecked(False)
         self.diffc_button.stateChanged.connect(self.button_state)
-        self.edit_button = QToolButton()
-        self.edit_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         # Add some of widgets to list_layout
-        list_layout.addWidget(self.edit_button)
         list_layout.addWidget(self.diffc_button)
-        list_layout.addWidget(use_default_label_container)
-
-        # Create and add combobox for showing unique labels in group
-        self.combo_box = ComboBox(self)
-        list_layout.addWidget(self.combo_box)
 
         # Create and add a widget for showing current label items
         self.label_list = QListWidget()
@@ -155,7 +137,7 @@ class MainWindow(QMainWindow, WindowMixin):
         label_list_container.setLayout(list_layout)
         self.label_list.itemActivated.connect(self.label_selection_changed)
         self.label_list.itemSelectionChanged.connect(self.label_selection_changed)
-        self.label_list.itemDoubleClicked.connect(self.edit_label)
+        # self.label_list.itemDoubleClicked.connect(self.edit_label)
         # Connect to itemChanged to detect checkbox changes.
         self.label_list.itemChanged.connect(self.label_item_changed)
         list_layout.addWidget(self.label_list)
@@ -327,7 +309,6 @@ class MainWindow(QMainWindow, WindowMixin):
         edit = action(get_str('editLabel'), self.edit_label,
                       'Ctrl+E', 'edit', get_str('editLabelDetail'),
                       enabled=False)
-        self.edit_button.setDefaultAction(edit)
 
         shape_line_color = action(get_str('shapeLineColor'), self.choose_shape_line_color,
                                   icon='color_line', tip=get_str('shapeLineColorDetail'),
@@ -342,7 +323,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Label list context menu.
         label_menu = QMenu()
-        add_actions(label_menu, (edit, delete))
+        add_actions(label_menu, [delete])
         self.label_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.label_list.customContextMenuRequested.connect(
             self.pop_label_list_menu)
@@ -380,7 +361,8 @@ class MainWindow(QMainWindow, WindowMixin):
             view=self.menu(get_str('menu_view')),
             help=self.menu(get_str('menu_help')),
             recentFiles=QMenu(get_str('menu_openRecent')),
-            labelList=label_menu)
+            labelList=label_menu
+            )
 
         # Auto saving : Enable auto saving if pressing next
         self.auto_saving = QAction(get_str('autoSaveMode'), self)
@@ -556,7 +538,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self._beginner = not value
         self.canvas.set_editing(True)
         self.populate_mode_actions()
-        self.edit_button.setVisible(not value)
         if value:
             self.actions.createMode.setEnabled(True)
             self.actions.editMode.setEnabled(False)
@@ -617,7 +598,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.label_file = None
         self.canvas.reset_state()
         self.label_coordinates.clear()
-        self.combo_box.cb.clear()
 
     def current_item(self):
         items = self.label_list.selectedItems()
@@ -728,7 +708,6 @@ class MainWindow(QMainWindow, WindowMixin):
             item.setText(text)
             item.setBackground(generate_color_by_text(text))
             self.set_dirty()
-            self.update_combo_box()
 
     # Tzutalin 20160906 : Add file list and dock to move faster
     def file_item_double_clicked(self, item=None):
@@ -791,7 +770,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.label_list.addItem(item)
         for action in self.actions.onShapesPresent:
             action.setEnabled(True)
-        self.update_combo_box()
 
     def remove_label(self, shape):
         if shape is None:
@@ -801,7 +779,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.label_list.takeItem(self.label_list.row(item))
         del self.shapes_to_items[shape]
         del self.items_to_shapes[item]
-        self.update_combo_box()
 
     def load_labels(self, shapes):
         s = []
@@ -830,19 +807,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 shape.fill_color = generate_color_by_text(label)
 
             self.add_label(shape)
-        self.update_combo_box()
         self.canvas.load_shapes(s)
-
-    def update_combo_box(self):
-        # Get the unique labels and add them to the Combobox.
-        items_text_list = [str(self.label_list.item(i).text()) for i in range(self.label_list.count())]
-
-        unique_text_list = list(set(items_text_list))
-        # Add a null row for showing all the labels
-        unique_text_list.append("")
-        unique_text_list.sort()
-
-        self.combo_box.update_items(unique_text_list)
 
     def save_labels(self, annotation_file_path):
         annotation_file_path = ustr(annotation_file_path)
@@ -891,7 +856,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.shape_selection_changed(True)
 
     def combo_selection_changed(self, index):
-        text = self.combo_box.cb.itemText(index)
         for i in range(self.label_list.count()):
             if text == "":
                 self.label_list.item(i).setCheckState(2)
@@ -925,19 +889,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         position MUST be in global coordinates.
         """
-        if not self.use_default_label_checkbox.isChecked() or not self.default_label_text_line.text():
-            if len(self.label_hist) > 0:
-                self.label_dialog = LabelDialog(
-                    parent=self, list_item=self.label_hist)
-
-            # Sync single class mode from PR#106
-            if self.single_class_mode.isChecked() and self.lastLabel:
-                text = self.lastLabel
-            else:
-                text = self.label_dialog.pop_up(text=self.prev_label_text)
-                self.lastLabel = text
-        else:
-            text = self.default_label_text_line.text()
+        text = "egg"
 
         # Add Chris
         self.diffc_button.setChecked(False)
